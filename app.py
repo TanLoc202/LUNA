@@ -4,8 +4,8 @@ from supabase import create_client, Client
 
 app = FastAPI()
 # --- CẤU HÌNH SUPABASE ---
-SUPABASE_URL = "https://ktsyxncfrpqxfdzmxudf.supabase.co"
-SUPABASE_KEY = "sb_publishable_1MkJASTMpiWAtaZmz78JXw_nGcgYJPl"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- CÁC HÀM CHÍNH ---
