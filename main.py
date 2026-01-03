@@ -34,14 +34,14 @@ async def receive_payment(request: Request):
         supabase.table("tb_transactions").insert({
             "id": data.get("id"),
             "gateway": data.get("gateway"),
-            "transactionDate": data.get("transactionDate"),
-            "accountNumber": data.get("accountNumber"),
+            "transactiondate": data.get("transactionDate"),
+            "accountnumber": data.get("accountNumber"),
             "code": data.get("code"),
             "content": data.get("content"),
-            "transferType": data.get("transferType"),
-            "transferAmount": data.get("transferAmount"),
+            "transfertype": data.get("transferType"),
+            "transferamount": data.get("transferAmount"),
             "accumulated": data.get("accumulated"),
-            "referenceCode": data.get("referenceCode"),
+            "referencecode": data.get("referenceCode"),
             "description": data.get("description")
         }).execute()
 
