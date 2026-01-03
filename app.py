@@ -18,7 +18,8 @@ def home():
 async def receive_payment(request: Request):
     try:
         data = await request.json()
-        
+        res = supabase.table("tb_transactions").insert(data).execute()
+
         # SePay gửi nội dung chuyển khoản ở trường 'content'
         ma_chuyen_khoan = data.get("code")
         so_tien_nhan = data.get("amount")
