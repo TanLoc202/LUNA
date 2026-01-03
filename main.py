@@ -18,27 +18,35 @@ def home():
 async def receive_payment(request: Request):
     try:
         data = await request.json()
-        res = supabase.table("tb_transactions").insert(data).execute()
 
-        # SePay gửi nội dung chuyển khoản ở trường 'content'
         ma_chuyen_khoan = data.get("code")
-        so_tien_nhan = data.get("amount")
+        so_tien_nhan = data.get("transferAmount")  # SePay gửi ở trường transferAmount
 
-        # 1. Kiểm tra xem mã chuyển khoản này có khớp với đơn hàng nào trong DB không
+        # Nếu code null, fallback sang content
+        if not ma_chuyen_khoan:
+            ma_chuyen_khoan = data.get("content")
+
+        # 1. Kiểm tra trùng lặp giao dịch
+        existing_tx = supabase.table("tb_transactions").select("*").eq("id", data.get("id")).execute()
+        if existing_tx.data:
+            return {"status": "ignored", "message": "Giao dịch đã tồn tại"}
+
+        # 2. Lưu giao dịch mới
+        supabase.table("tb_transactions").insert(data).execute()
+
+        # 3. Kiểm tra đơn hàng
         res = supabase.table("don_hang").select("*").eq("ma_chuyen_khoan", ma_chuyen_khoan).execute()
-        
         if not res.data:
-            print(f"❌ Không tìm thấy đơn hàng với mã: {ma_chuyen_khoan}")
-            print(f"Received data: {data}")
-            return {"status": "error", "message": "Mã đơn hàng hông khớp"}
+            return {"status": "error", "message": "Không tìm thấy đơn hàng"}
 
-        # 2. Nếu tìm thấy, cập nhật trạng thái thành 'Đã thanh toán'
-        if so_tien_nhan >= res.data[0]['tong_tien']:   
-            order_id = res.data [0]['id']
-            supabase.table("don_hang").update({"trang_thai": "Đã thanh toán"}).eq("id", order_id).execute()
-            print(f"✅ Đơn hàng #{order_id} đã thanh toán thành công!")
-            return {"status": "success", "message": f"Đã chốt đơn #{order_id}"}
+        order = res.data[0]
+
+        # 4. Kiểm tra số tiền
+        if so_tien_nhan == order['tong_tien']:
+            supabase.table("don_hang").update({"trang_thai": "Đã thanh toán"}).eq("id", order['id']).execute()
+            return {"status": "success", "message": f"Đơn hàng #{order['id']} đã thanh toán"}
+        else:
+            return {"status": "error", "message": "Số tiền không khớp"}
 
     except Exception as e:
-        print(f"🔥 Lỗi xử lý: {str(e)}")
-        raise HTTPException(status_code=500, detail="Lỗi server rồi bà chủ ơi")
+        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
