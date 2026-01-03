@@ -18,35 +18,50 @@ def home():
 async def receive_payment(request: Request):
     try:
         data = await request.json()
+        print("Webhook data:", data)
 
-        ma_chuyen_khoan = data.get("code")
-        so_tien_nhan = data.get("transferAmount")  # SePay gửi ở trường transferAmount
+        # Lấy mã chuyển khoản
+        ma_chuyen_khoan = data.get("code") or data.get("content")
+        so_tien_nhan = data.get("transferAmount")
 
-        # Nếu code null, fallback sang content
-        if not ma_chuyen_khoan:
-            ma_chuyen_khoan = data.get("content")
-
-        # 1. Kiểm tra trùng lặp giao dịch
+        # 1. Kiểm tra trùng lặp giao dịch theo id
         existing_tx = supabase.table("tb_transactions").select("*").eq("id", data.get("id")).execute()
         if existing_tx.data:
+            print("❌ Giao dịch đã tồn tại")
             return {"status": "ignored", "message": "Giao dịch đã tồn tại"}
 
-        # 2. Lưu giao dịch mới
-        supabase.table("tb_transactions").insert(data).execute()
+        # 2. Lưu giao dịch mới (chỉ insert các trường cần thiết)
+        supabase.table("tb_transactions").insert({
+            "id": data.get("id"),
+            "gateway": data.get("gateway"),
+            "transactionDate": data.get("transactionDate"),
+            "accountNumber": data.get("accountNumber"),
+            "code": data.get("code"),
+            "content": data.get("content"),
+            "transferType": data.get("transferType"),
+            "transferAmount": data.get("transferAmount"),
+            "accumulated": data.get("accumulated"),
+            "referenceCode": data.get("referenceCode"),
+            "description": data.get("description")
+        }).execute()
 
         # 3. Kiểm tra đơn hàng
         res = supabase.table("don_hang").select("*").eq("ma_chuyen_khoan", ma_chuyen_khoan).execute()
         if not res.data:
+            print("❌ Không tìm thấy đơn hàng")
             return {"status": "error", "message": "Không tìm thấy đơn hàng"}
 
         order = res.data[0]
 
-        # 4. Kiểm tra số tiền
-        if so_tien_nhan == order['tong_tien']:
+        # 4. Kiểm tra số tiền (ép kiểu về float)
+        if float(so_tien_nhan) == float(order['tong_tien']):
             supabase.table("don_hang").update({"trang_thai": "Đã thanh toán"}).eq("id", order['id']).execute()
+            print(f"✅ Đơn hàng #{order['id']} đã thanh toán")
             return {"status": "success", "message": f"Đơn hàng #{order['id']} đã thanh toán"}
         else:
+            print("❌ Số tiền không khớp")
             return {"status": "error", "message": "Số tiền không khớp"}
 
     except Exception as e:
+        print(f"🔥 Lỗi xử lý: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
